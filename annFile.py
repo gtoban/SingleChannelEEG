@@ -42,6 +42,7 @@ class tf_ann(object):
         self.overfitSteps = overfitSteps
         self.regMethod = 0
         self.optimizer = "gradientdescent"
+        self.batch = 0
 
     def setL1Regularization(self,scale=0.005):
         self.regMethod = 1
@@ -72,6 +73,10 @@ class tf_ann(object):
         self.optimizer = "rmsprop"
         self.decay = decay
         self.momentum = momentum
+
+    def setBatch(self,batchSize=10):
+        self.batch = 1
+        self.batchSize = batchSize
         
     def predict(self,X,Y):
         
@@ -212,6 +217,17 @@ class tf_ann(object):
         init = tf.global_variables_initializer()
         sess.run(init)
 
+        #==================================
+        #
+        # Sampling: Batch
+        #
+        #=================================
+        if self.batch == 1:
+            numBatches = int(len(X)/self.batchSize)
+            batchIteration = -1
+            OX = OX[0:self.batchSize]
+            OY = OY[0:self.batchSize]
+            OYT = OYT[0:self.batchSize]
         for iteration in range(self.trainIterations):
             warnings.filterwarnings("error")
             try:
@@ -221,63 +237,133 @@ class tf_ann(object):
                 # tensorflow forward
                 #
                 #=================================
-                sess.run(train_op, feed_dict={tfX: X, tfY: Y})
-                if iteration%self.trainPrintStep == 0:
-                    #C = costFunc(Y,Prob)
-                    C = sess.run(tf_cost, feed_dict={tfX: X, tfY: Y}) 
-                    expA = np.exp(sess.run(logits, feed_dict={tfX: X, tfY: Y}))
-                    Prob = expA / expA.sum(axis=1, keepdims=True)
-                    P = self.argDecision(Prob)
-                    expAo = np.exp(sess.run(logits, feed_dict={tfX: OX, tfY: OY}))
-                    Probo = expAo / expAo.sum(axis=1, keepdims=True)
-                    Po = self.argDecision(Probo)            
-                    r = self.classification_rate(YT,P)
-                    ro = self.classification_rate(OYT,Po)
-                    #=================================
-                    # Stopping Conditions
-                    #================================
-                    if abs(rprev-r) < 0.001:
-                        #if np.abs(C) < 10e-1:
-                        rprev = r
-                        rChangeCount += 1
-                        if (rChangeCount > 10):
-                            stopReason = "ClassRateChange"
-                            break
-                    else:
-                        rChangeCount = 0
+                if self.batch == 1:
+                    X,Y,YT = self.myShuffle(X,Y,YT)
+                    for batchRun in range(numBatches):
+                        batchX = X[batchRun*self.batchSize:(batchRun*self.batchSize + self.batchSize)]
+                        batchY = Y[batchRun*self.batchSize:(batchRun*self.batchSize + self.batchSize)]
                         
-                    if (ro>OFMax):
-                        OFMax = ro
-                        OFiteration=1
-                        #OWb = Wb[:]
-                        OWb = []
-                        for i in range(int(len(Wb)/2)):
-                            index = i*2
-                            OWb.append(Wb[index].eval(session=sess))
-                            OWb.append(Wb[index+1].eval(session=sess))
-                            OFstopC = C
-                            OFstopr = r
-                            OFstopro = ro
-                            OFstopiteration = iteration
-                    else:
-                        if (ro < .3):
-                            OFiteration = 1
-                        else:
-                            #if overfit is 10% < OFMax
-                            if (r > ro and (OFMax - 0.10) > ro ):
-                                OFiteration += 1
+                        sess.run(train_op, feed_dict={tfX: batchX, tfY: batchY})
+                        batchIteration +=1
+                        if batchIteration%self.trainPrintStep == 0:
+                            batchYT = YT[batchRun*self.batchSize:(batchRun*self.batchSize + self.batchSize)]
+                            #C = costFunc(Y,Prob)
+                            C = sess.run(tf_cost, feed_dict={tfX: batchX, tfY: batchY}) 
+                            expA = np.exp(sess.run(logits, feed_dict={tfX: batchX, tfY: batchY}))
+                            with open(self.dir_path + "/trainStatusFile.txt","a") as TSFile:
+                                TSFile.write("EXPA")
+                            Prob = expA / expA.sum(axis=1, keepdims=True)
+                            P = self.argDecision(Prob)
+                            expAo = np.exp(sess.run(logits, feed_dict={tfX: OX, tfY: OY}))
+                            with open(self.dir_path + "/trainStatusFile.txt","a") as TSFile:
+                                TSFile.write("EXPAo")
+                            Probo = expAo / expAo.sum(axis=1, keepdims=True)
+                            Po = self.argDecision(Probo)            
+                            r = self.classification_rate(batchYT,P)
+                            ro = self.classification_rate(OYT,Po)
+                            #=================================
+                            # Stopping Conditions
+                            #================================
+                            if abs(rprev-r) < 0.001:
+                                #if np.abs(C) < 10e-1:
+                                rprev = r
+                                rChangeCount += 1
+                                if (rChangeCount > 10):
+                                    stopReason = "ClassRateChange"
+                                    break
                             else:
-                                OFiteration = 1
+                                rChangeCount = 0
+                        
+                            if (ro>OFMax):
+                                OFMax = ro
+                                OFiteration=1
+                                #OWb = Wb[:]
+                                OWb = []
+                                for i in range(int(len(Wb)/2)):
+                                    index = i*2
+                                    OWb.append(Wb[index].eval(session=sess))
+                                    OWb.append(Wb[index+1].eval(session=sess))
+                                    OFstopC = C
+                                    OFstopr = r
+                                    OFstopro = ro
+                                    OFstopiteration = iteration
+                            else:
+                                if (ro < .3):
+                                    OFiteration = 1
+                                else:
+                                    #if overfit is 10% < OFMax
+                                    if (r > ro and (OFMax - 0.10) > ro ):
+                                        OFiteration += 1
+                                    else:
+                                        OFiteration = 1
                                 
-                    #OFiteration+=1
-                    if (OFiteration>self.overfitSteps):
-                        stopReason = "Overfit"
-                        break
-                    with open(self.dir_path + "/trainStatusFile.txt","a") as TSFile:
-                        TSFile.write("\n----------\niteration:"+str(iteration)+"\ncost:"+str(C)+"\nclassifcation:"+str(r)+"\nOverfitClass:"+str(ro)+"\n")
-                    cost.append(C)
-                    YTrate.append(r)
-                    OYTrate.append(ro)
+                            #OFiteration+=1
+                            if (OFiteration>self.overfitSteps):
+                                stopReason = "Overfit"
+                                break
+                            with open(self.dir_path + "/trainStatusFile.txt","a") as TSFile:
+                                TSFile.write("\n----------\niteration:"+str(iteration)+"\ncost:"+str(C)+"\nclassifcation:"+str(r)+"\nOverfitClass:"+str(ro)+"\n")
+                            cost.append(C)
+                            YTrate.append(r)
+                            OYTrate.append(ro)
+                else:
+                    sess.run(train_op, feed_dict={tfX: X, tfY: Y})
+                    if iteration%self.trainPrintStep == 0:
+                        #C = costFunc(Y,Prob)
+                        C = sess.run(tf_cost, feed_dict={tfX: X, tfY: Y}) 
+                        expA = np.exp(sess.run(logits, feed_dict={tfX: X, tfY: Y}))
+                        Prob = expA / expA.sum(axis=1, keepdims=True)
+                        P = self.argDecision(Prob)
+                        expAo = np.exp(sess.run(logits, feed_dict={tfX: OX, tfY: OY}))
+                        Probo = expAo / expAo.sum(axis=1, keepdims=True)
+                        Po = self.argDecision(Probo)            
+                        r = self.classification_rate(YT,P)
+                        ro = self.classification_rate(OYT,Po)
+                        #=================================
+                        # Stopping Conditions
+                        #================================
+                        if abs(rprev-r) < 0.001:
+                            #if np.abs(C) < 10e-1:
+                            rprev = r
+                            rChangeCount += 1
+                            if (rChangeCount > 10):
+                                stopReason = "ClassRateChange"
+                                break
+                        else:
+                            rChangeCount = 0
+                        
+                        if (ro>OFMax):
+                            OFMax = ro
+                            OFiteration=1
+                            #OWb = Wb[:]
+                            OWb = []
+                            for i in range(int(len(Wb)/2)):
+                                index = i*2
+                                OWb.append(Wb[index].eval(session=sess))
+                                OWb.append(Wb[index+1].eval(session=sess))
+                                OFstopC = C
+                                OFstopr = r
+                                OFstopro = ro
+                                OFstopiteration = iteration
+                        else:
+                            if (ro < .3):
+                                OFiteration = 1
+                            else:
+                                #if overfit is 10% < OFMax
+                                if (r > ro and (OFMax - 0.10) > ro ):
+                                    OFiteration += 1
+                                else:
+                                    OFiteration = 1
+                                
+                        #OFiteration+=1
+                        if (OFiteration>self.overfitSteps):
+                            stopReason = "Overfit"
+                            break
+                        with open(self.dir_path + "/trainStatusFile.txt","a") as TSFile:
+                            TSFile.write("\n----------\niteration:"+str(iteration)+"\ncost:"+str(C)+"\nclassifcation:"+str(r)+"\nOverfitClass:"+str(ro)+"\n")
+                        cost.append(C)
+                        YTrate.append(r)
+                        OYTrate.append(ro)
             except KeyboardInterrupt as e:
                 stored_exception=sys.exc_info()
                 stopReason = "User Stop"
@@ -302,20 +388,21 @@ class tf_ann(object):
         #=================
         # OUTSIDE LOOP
         #================
-        C = sess.run(tf_cost, feed_dict={tfX: X, tfY: Y})
-        expA = np.exp(sess.run(logits, feed_dict={tfX: X, tfY: Y}))
-        Prob = expA / expA.sum(axis=1, keepdims=True)
-        P = self.argDecision(Prob)
+        if (self.batch != 1):
+            C = sess.run(tf_cost, feed_dict={tfX: X, tfY: Y})
+            expA = np.exp(sess.run(logits, feed_dict={tfX: X, tfY: Y}))
+            Prob = expA / expA.sum(axis=1, keepdims=True)
+            P = self.argDecision(Prob)
         
-        expAo = np.exp(sess.run(logits, feed_dict={tfX: OX, tfY: OY}))
-        Probo = expAo / expAo.sum(axis=1, keepdims=True)
-        Po = self.argDecision(Probo)
+            expAo = np.exp(sess.run(logits, feed_dict={tfX: OX, tfY: OY}))
+            Probo = expAo / expAo.sum(axis=1, keepdims=True)
+            Po = self.argDecision(Probo)
         
-        r = self.classification_rate(YT,P)
-        ro = self.classification_rate(OYT,Po)
-        cost.append(C)
-        YTrate.append(r)
-        OYTrate.append(ro)
+            r = self.classification_rate(YT,P)
+            ro = self.classification_rate(OYT,Po)
+            cost.append(C)
+            YTrate.append(r)
+            OYTrate.append(ro)
 
         with open(self.dir_path + "/trainStatusFile.txt","a") as TSFile:
             TSFile.write("\n----------\niteration:"+str(iteration)+"\ncost:"+str(C)+"\nclassifcation:"+str(r)+"\nOverfitClass:"+str(ro)+"\n")
@@ -425,7 +512,22 @@ class tf_ann(object):
         
         return acc,sens,spec
             
-            
+    def myShuffle(self,X,Y,YT):
+        N = len(X)
+        for i in range(N):
+            xt = X[i]
+            yt = Y[i]
+            tt = YT[i]
+            ri = np.random.randint(0,N)
+            while (ri == i):
+                ri = np.random.randint(0,N)
+            X[i] = X[ri]
+            Y[i] = Y[ri]
+            YT[i] = YT[ri]
+            X[ri] = xt
+            Y[ri] = yt
+            YT[ri] = tt
+        return X,Y,YT
     #return float(n_correct) / n_total
 
     
