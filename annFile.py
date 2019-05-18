@@ -257,7 +257,7 @@ class tf_ann(object):
         tfile = open(self.destPath + "trainStats.txt", "w")
         tfile.write("\n----------\niteration:" + str(iteration)+"\ncost:"+str(C)+"\nclassifcation:"+str(r)+"\noverfit classification:"+str(ro)+"\n")
 
-        if(OFiteration > overfitSteps):
+        if(OFiteration > self.overfitSteps):
         
             tfile.write("\n----------\nOverFit Stop At:\n")
             tfile.write("\n----------\niteration:" + str(OFstopiteration)+"\ncost:"+str(OFstopC)+"\nclassifcation:"+str(OFstopr)+"\noverfit classification:"+str(OFstopro)+"\n")
