@@ -40,7 +40,39 @@ class tf_ann(object):
         self.trainPrintStep = trainPrintStep
         self.learningRate = learningRate
         self.overfitSteps = overfitSteps
+        self.regMethod = 0
+        self.optimizer = "gradientdescent"
 
+    def setL1Regularization(self,scale=0.005):
+        self.regMethod = 1
+        self.l1Scale = scale
+
+    def setL2Regularization(self, scale=10e-3):
+        self.regMethod = 2
+        self.l2Scale = scale
+
+    def setNoRegularization(self):
+        self.regMethod = 0
+
+    def setAdamOptimizer(self,beta1=0.9, beta2=0.999, epsilon=1e-08):
+        self.optimizer = "adam"
+        self.adamBeta1 = beta1
+        self.adamBeta2 = beta2
+        self.adamEpsilon = epsilon
+
+    def setGradientDescent(self):
+        self.optimizer = "gradientdescent"
+
+    def setMomentum(self, momentum=0.99, nesterov=True):
+        self.optimizer = "momentum"
+        self.momentum = momentum
+        self.nesterov = nesterov
+
+    def setRMSProp(self,decay=0.99, momentum=0.999):
+        self.optimizer = "rmsprop"
+        self.decay = decay
+        self.momentum = momentum
+        
     def predict(self,X,Y):
         
         D = len(X[0])
@@ -132,15 +164,48 @@ class tf_ann(object):
 
         logits = self.tf_forward(tfX, Wb)
 
+        #==================================
+        #
+        # COST: L1 or L2 Regularization
+        #
+        #=================================
+
+
         tf_cost = tf.reduce_mean(
             tf.nn.softmax_cross_entropy_with_logits_v2(
                 labels=tfY,
                 logits=logits
             )
         )
-
-        train_op = tf.train.GradientDescentOptimizer(self.learningRate).minimize(tf_cost)
         
+        if (self.regMethod ==  1):
+            #https://stackoverflow.com/questions/36706379/how-to-exactly-add-l1-regularisation-to-tensorflow-error-function
+            l1_regularizer = tf.contrib.layers.l1_regularizer(
+                scale=self.l1Scale, scope=None
+                )
+            tf_cost += tf.contrib.layers.apply_regularization(l1_regularizer, Wb)
+        elif (self.regMethod == 2):
+            l2_regulizer = self.l2Scale*sum([tf.nn.l2_loss(aweight) for aweight in Wb])
+            tf_cost += l2_regulizer
+
+        #==================================
+        #
+        # Optimizer: gradientdescent, adam, momentum, rmsprop
+        #
+        #=================================
+            
+        if (self.optimizer == "gradientdescent"):
+            train_op = tf.train.GradientDescentOptimizer(self.learningRate).minimize(tf_cost)
+        elif (self.optimizer == "adam"):
+            train_op = tf.train.AdamOptimizer(self.learningRate, beta1=self.adamBeta1, beta2=self.adamBeta2, epsilon=self.adamEpsilon).minimize(tf_cost)
+        elif (self.optimizer == "momentum"):
+            train_op = tf.train.MomentumOptimizer(self.learningRate,momentum=self.momentum,use_nesterov=self.nesterov).minimize(tf_cost)
+        elif (self.optimizer == "rmsprop"):
+            train_op = tf.train.RMSPropOptimizer(self.learningRate,decay=self.decay,momentum=self.momentum).minimize(tf_cost)
+        else:
+            print("NO OPTIMIZER SELECTED")
+            exit()
+            
         predict_op = tf.argmax(logits, 1)
 
         sess = tf.Session()
@@ -275,9 +340,7 @@ class tf_ann(object):
             trainFile.write("%14s," % (str("%4.2f" % OFstopr)))
             trainFile.write("%14s" % (str("%4.2f" % OFstopro)))
         
-        print("PRINTED NODES")                 
         for i in range(int(len(Wb)/2)):
-            print("PRINTED INDEX", i)                 
             index = i*2
             self.writeTrainedNodes(Wb[index].eval(session=sess),
                             Wb[index+1].eval(session=sess),
