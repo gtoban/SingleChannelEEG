@@ -30,7 +30,7 @@ writeStartingGuess = 0
 normalize = 1 ## used to specify in normalizing is used (x - mean)/std
 inputnormalizeType="std Dev"
 activationType="relu"
-layers = 1
+layers = 2
 layerSizeMultiplier = 0.5 ## LAYER sizes are a multiple of input dimensions
 decision = 50 # if REM ([REM NotREM]) >= decision then REM is choice
 stopReason = "iterations"
@@ -40,15 +40,6 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 destPath = dir_path
 trainId = ""
 trainDestination = dir_path
-
-#class GracefulKiller:
-#  kill_now = False
-#  def __init__(self):
-#    signal.signal(signal.SIGINT, self.exit_gracefully)
-#    signal.signal(signal.SIGTERM, self.exit_gracefully)
-#
-#  def exit_gracefully(self,signum, frame):
-#    self.kill_now = True
 
 
 def main():
@@ -191,11 +182,21 @@ def predict(fname,fileId):
     eegObj = eegData(destPath)
     
     X,Y = eegObj.getPredictData(fname,1)
-    
+    YT = np.argmax(Y,axis=1)
     annObj = tf_ann(dir_path, destPath)
     annObj.predict_init(decision, layerSizeMultiplier, predictOverfit, layers)
-    annObj.predict(X,Y)
-    
+    P = annObj.predict(X,Y)
+        
+    acc,sens,spec=annObj.allStats(YT,P)
+    print("Decision:", decision)
+    print("Accuracy:",acc)
+    print("Sensitivity:",sens)
+    print("Specificity:",spec)
+    print("Classification Rate",annObj.classification_rate(YT,P))
+    tfile = open(destPath + "predictStats.txt", "a")
+    tfile.write(fileId+ ", " + str(acc) + "," + str(sens) + "," +str(spec) + "," + str(annObj.classification_rate(YT,P)) + "\n")
+    tfile.close()
+
 def predictAll(trainDest, decomp):
     open(destPath + "predictStats.txt","w").close()
     with open(dir_path + "/sourceData/validPatientNights.csv") as nightsFile:

@@ -8,7 +8,7 @@ import os
 import signal
 import time
 
-
+#https://stackoverflow.com/questions/18499497/how-to-process-sigterm-signal-gracefully
 class GracefulKiller:
   kill_now = False
   def __init__(self):
@@ -43,7 +43,6 @@ class tf_ann(object):
 
     def predict(self,X,Y):
         
-        YT = np.argmax(Y,axis=1)
         D = len(X[0])
         print("Input Params: %5d" % D)
         MD = int(len(X[0])*self.layerSizeMultiplier) # number of input parameters
@@ -64,17 +63,9 @@ class tf_ann(object):
         Prob = expA / expA.sum(axis=1, keepdims=True)
         #P = np.argmax(Prob,axis=1)
         P = self.argDecision(Prob)            
-        acc,sens,spec=self.allStats(YT,P)
-        print("Decision:",decision)
-        print("Accuracy:",acc)
-        print("Sensitivity:",sens)
-        print("Specificity:",spec)
-        print("Classification Rate",self.classification_rate(YT,P))
-        tfile = open(destPath + "predictStats.txt", "a")
-        tfile.write(fileId+ ", " + str(acc) + "," + str(sens) + "," +str(spec) + "," + str(self.classification_rate(YT,P)) + "\n")
-        tfile.close()
-    
+            
         sess.close()
+        return P
 
     def fit(self, X,OX,Y,OY):
         killer = GracefulKiller()
@@ -284,8 +275,9 @@ class tf_ann(object):
             trainFile.write("%14s," % (str("%4.2f" % OFstopr)))
             trainFile.write("%14s" % (str("%4.2f" % OFstopro)))
         
-                         
+        print("PRINTED NODES")                 
         for i in range(int(len(Wb)/2)):
+            print("PRINTED INDEX", i)                 
             index = i*2
             self.writeTrainedNodes(Wb[index].eval(session=sess),
                             Wb[index+1].eval(session=sess),
