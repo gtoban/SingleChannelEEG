@@ -79,7 +79,7 @@ def tf_train(fname,oname):
     
     annObj = tf_ann(gparam.dir_path, gparam.destPath)
     annObj.train_init(gparam.layerSizeMultiplier, gparam.layers, gparam.trainRandomStart, gparam.trainIterations, gparam.trainPrintStep, gparam.learningRate, gparam.overfitSteps )
-    annObj.setL2Regularization()
+    annObj.setDropOutRegularization()
     #annObj.setRMSProp()
     annObj.setBatch()
     annObj.fit(X,OX,Y,OY)

@@ -52,6 +52,15 @@ class tf_ann(object):
         self.regMethod = 2
         self.l2Scale = scale
 
+    def setDropOutRegularization(self, dropout_rates=[]):
+        self.regMethod = 3
+        if (len(dropout_rates) < self.layers):
+            self.dropout_rates = [0.5 for i in range(self.layers)]
+            self.dropout_rates[0] = 0.8
+        else:
+            self.dropout_rates = dropout_rates
+            
+
     def setNoRegularization(self):
         self.regMethod = 0
 
@@ -77,7 +86,10 @@ class tf_ann(object):
     def setBatch(self,batchSize=10):
         self.batch = 1
         self.batchSize = batchSize
-        
+
+    def setNoBatch(self):
+        self.batch = 1
+
     def predict(self,X,Y):
         
         D = len(X[0])
@@ -106,7 +118,7 @@ class tf_ann(object):
 
     def fit(self, X,OX,Y,OY):
         killer = GracefulKiller()
-        
+        trainError = False
         YT = self.argDecision(Y)    
         OYT = self.argDecision(OY)
         
@@ -118,13 +130,12 @@ class tf_ann(object):
         K = int(Y.shape[1]) # of classes (number of output parameters)
         #==================================
         #
-        # tensorflow X and Y
+        # tensorflow X 
         #
         #=================================
         tfX = tf.placeholder(tf.float32, [None, D])
-        tfY = tf.placeholder(tf.float32, [None, K])
-        tfOX = tf.placeholder(tf.float32, [None, D])
-
+        
+        
         #==================================
         #
         # tensorflow Weights and Biases
@@ -171,27 +182,52 @@ class tf_ann(object):
 
         #==================================
         #
-        # COST: L1 or L2 Regularization
+        # COST: L1, L2, or DROPOUT Regularization
         #
         #=================================
 
 
-        tf_cost = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits_v2(
-                labels=tfY,
-                logits=logits
-            )
-        )
         
-        if (self.regMethod ==  1):
-            #https://stackoverflow.com/questions/36706379/how-to-exactly-add-l1-regularisation-to-tensorflow-error-function
-            l1_regularizer = tf.contrib.layers.l1_regularizer(
-                scale=self.l1Scale, scope=None
+        
+        if (self.regMethod < 3): #NOT DROPOUT (could be L1 or L2)
+            tfY = tf.placeholder(tf.float32, [None, K])
+            tf_cost = tf.reduce_mean(
+                tf.nn.softmax_cross_entropy_with_logits_v2(
+                    labels=tfY,
+                    logits=logits
                 )
-            tf_cost += tf.contrib.layers.apply_regularization(l1_regularizer, Wb)
-        elif (self.regMethod == 2):
-            l2_regulizer = self.l2Scale*sum([tf.nn.l2_loss(aweight) for aweight in Wb])
-            tf_cost += l2_regulizer
+            )
+            tf_testcost = tf.reduce_mean(
+                tf.nn.softmax_cross_entropy_with_logits_v2(
+                    labels=tfY,
+                    logits=logits
+                )
+            )
+            if (self.regMethod ==  1):
+                #https://stackoverflow.com/questions/36706379/how-to-exactly-add-l1-regularisation-to-tensorflow-error-function
+                l1_regularizer = tf.contrib.layers.l1_regularizer(
+                    scale=self.l1Scale, scope=None
+                    )
+                tf_cost += tf.contrib.layers.apply_regularization(l1_regularizer, Wb)
+            elif (self.regMethod == 2):
+                l2_regulizer = self.l2Scale*sum([tf.nn.l2_loss(aweight) for aweight in Wb])
+                tf_cost += l2_regulizer
+        elif (self.regMethod == 3): #IS DROPOUT
+            dropoutLogits = self.tf_dropoutForward(tfX, Wb)
+            tfY = tf.placeholder(tf.int64, shape=(None,))
+            tf_cost = tf.reduce_mean(
+                tf.nn.sparse_softmax_cross_entropy_with_logits(
+                    labels=tfY,
+                    logits=dropoutLogits
+                )
+            )
+            tf_testcost = tf.reduce_mean(
+                tf.nn.sparse_softmax_cross_entropy_with_logits(
+                    labels=tfY,
+                    logits=logits
+                )
+            )
+    
 
         #==================================
         #
@@ -224,12 +260,15 @@ class tf_ann(object):
         #=================================
         if self.batch == 1:
             numBatches = int(len(X)/self.batchSize)
-            batchIteration = -1
+            #ERROR FIX: large overfit sample size causes overflow
             OX = OX[0:self.batchSize]
             OY = OY[0:self.batchSize]
             OYT = OYT[0:self.batchSize]
-        for iteration in range(self.trainIterations):
+        #for iteration in range(self.trainIterations):
+        iteration = -1
+        while iteration < self.trainIterations: 
             warnings.filterwarnings("error")
+            iteration += 1
             try:
                 
                 #==================================
@@ -242,21 +281,23 @@ class tf_ann(object):
                     for batchRun in range(numBatches):
                         batchX = X[batchRun*self.batchSize:(batchRun*self.batchSize + self.batchSize)]
                         batchY = Y[batchRun*self.batchSize:(batchRun*self.batchSize + self.batchSize)]
-                        
-                        sess.run(train_op, feed_dict={tfX: batchX, tfY: batchY})
-                        batchIteration +=1
-                        if batchIteration%self.trainPrintStep == 0:
+                        if (self.regMethod == 3): #IS DROPOUT
+                            costY = self.argDecision(batchY)
+                            
+                        else:
+                            costY = batchY
+                        sess.run(train_op, feed_dict={tfX: batchX, tfY: costY})
+                        iteration +=1
+                        if iteration%self.trainPrintStep == 0:
                             batchYT = YT[batchRun*self.batchSize:(batchRun*self.batchSize + self.batchSize)]
                             #C = costFunc(Y,Prob)
-                            C = sess.run(tf_cost, feed_dict={tfX: batchX, tfY: batchY}) 
-                            expA = np.exp(sess.run(logits, feed_dict={tfX: batchX, tfY: batchY}))
-                            with open(self.dir_path + "/trainStatusFile.txt","a") as TSFile:
-                                TSFile.write("EXPA")
+                            C = sess.run(tf_testcost, feed_dict={tfX: batchX, tfY: costY}) 
+                            expA = np.exp(sess.run(logits, feed_dict={tfX: batchX}))
+                            
                             Prob = expA / expA.sum(axis=1, keepdims=True)
                             P = self.argDecision(Prob)
-                            expAo = np.exp(sess.run(logits, feed_dict={tfX: OX, tfY: OY}))
-                            with open(self.dir_path + "/trainStatusFile.txt","a") as TSFile:
-                                TSFile.write("EXPAo")
+                            expAo = np.exp(sess.run(logits, feed_dict={tfX: OX}))
+                            
                             Probo = expAo / expAo.sum(axis=1, keepdims=True)
                             Po = self.argDecision(Probo)            
                             r = self.classification_rate(batchYT,P)
@@ -307,14 +348,19 @@ class tf_ann(object):
                             YTrate.append(r)
                             OYTrate.append(ro)
                 else:
-                    sess.run(train_op, feed_dict={tfX: X, tfY: Y})
+                    if (self.regMethod == 3): #IS DROPOUT
+                        costY = self.argDecision(Y)
+                            
+                    else:
+                        costY = Y
+                    sess.run(train_op, feed_dict={tfX: X, tfY: costY})
                     if iteration%self.trainPrintStep == 0:
                         #C = costFunc(Y,Prob)
-                        C = sess.run(tf_cost, feed_dict={tfX: X, tfY: Y}) 
-                        expA = np.exp(sess.run(logits, feed_dict={tfX: X, tfY: Y}))
+                        C = sess.run(tf_cost, feed_dict={tfX: X, tfY: costY}) 
+                        expA = np.exp(sess.run(tf_testcost, feed_dict={tfX: X}))
                         Prob = expA / expA.sum(axis=1, keepdims=True)
                         P = self.argDecision(Prob)
-                        expAo = np.exp(sess.run(logits, feed_dict={tfX: OX, tfY: OY}))
+                        expAo = np.exp(sess.run(logits, feed_dict={tfX: OX}))
                         Probo = expAo / expAo.sum(axis=1, keepdims=True)
                         Po = self.argDecision(Probo)            
                         r = self.classification_rate(YT,P)
@@ -374,6 +420,7 @@ class tf_ann(object):
                 print("Caught Warning")
                 print(str(e), file=sys.stderr)
                 stopReason = "Compute Error"
+                trainError = True
                 break
 
             if killer.kill_now:
@@ -388,7 +435,7 @@ class tf_ann(object):
         #=================
         # OUTSIDE LOOP
         #================
-        if (self.batch != 1):
+        if (self.batch != 1 and not trainError):
             C = sess.run(tf_cost, feed_dict={tfX: X, tfY: Y})
             expA = np.exp(sess.run(logits, feed_dict={tfX: X, tfY: Y}))
             Prob = expA / expA.sum(axis=1, keepdims=True)
@@ -455,7 +502,14 @@ class tf_ann(object):
             Z = tf.nn.relu(tf.matmul(Z, Wb[index]) + Wb[index+1])
         return tf.matmul(Z, Wb[-2]) + Wb[-1]
 
-    
+    def tf_dropoutForward(self,X, Wb):
+        Z = tf.nn.relu(tf.matmul(X, Wb[0]) + Wb[1])
+        Z = tf.nn.dropout(Z, rate=self.dropout_rates[0])
+        for i in range(1,self.layers):
+            index = i*2
+            Z = tf.nn.relu(tf.matmul(Z, Wb[index]) + Wb[index+1])
+            Z = tf.nn.dropout(Z, rate=self.dropout_rates[i])
+        return tf.matmul(Z, Wb[-2]) + Wb[-1]
     # Desc: gets hidden layer sizes based on layers (NUMBER OF HIDDEN LAYERS VAR)
     # input: (D = number of dimensions of input)
     # return: array M (an array of length layers with the size of each layer 
