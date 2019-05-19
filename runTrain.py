@@ -36,8 +36,9 @@ def main():
         paramsFile.write("    train Data,  Overfit Data, learning Rate,")
         paramsFile.write("max Iterations,   print Steps, Overfit Steps,")
         paramsFile.write("    activation,     normalize,    ANN layers,     layerSize,")
-        paramsFile.write("    Decision %,        stopIt,")
-        paramsFile.write("    stopReason,          Cost,     ClassRate,")
+        paramsFile.write("        stopIt,")
+        paramsFile.write("    stopReason,regularization,    optimizer,       sample,")
+        paramsFile.write("          Cost,     ClassRate,")
         paramsFile.write("  OvrftClassRt,")
         paramsFile.write("      OFStopIt,")
         paramsFile.write("        OFCost,   OFClassRate,OFOvrftClassRt\n")
@@ -76,6 +77,18 @@ def tf_train(fname,oname):
     if (gparam.normalize):
         X, OX = eegObj.normalizeData(X, OX)        
     open(gparam.dir_path + "/trainStatusFile.txt","w").close()
+
+    #paramsFile.write("%14s" %) #14 digits
+    with open(gparam.destPath+"trainParams.txt","a") as paramsFile:
+        paramsFile.write("%14s," % sys.argv[1])
+        paramsFile.write("%14s," % sys.argv[2])
+        paramsFile.write("%14s," % str(gparam.learningRate))
+        paramsFile.write("%14s," % str(gparam.trainIterations))
+        paramsFile.write("%14s," % str(gparam.trainPrintStep))
+        paramsFile.write("%14s," % str(gparam.overfitSteps))
+        paramsFile.write("%14s," % gparam.activationType)
+        paramsFile.write("%14s," % gparam.inputnormalizeType)
+        paramsFile.write("%14s," % str(gparam.layers))
     
     annObj = tf_ann(gparam.dir_path, gparam.destPath)
     annObj.train_init(gparam.layerSizeMultiplier, gparam.layers, gparam.trainRandomStart, gparam.trainIterations, gparam.trainPrintStep, gparam.learningRate, gparam.overfitSteps )

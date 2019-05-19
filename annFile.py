@@ -40,20 +40,20 @@ class tf_ann(object):
         self.trainPrintStep = trainPrintStep
         self.learningRate = learningRate
         self.overfitSteps = overfitSteps
-        self.regMethod = 0
+        self.regMethod = "none"
         self.optimizer = "gradientdescent"
-        self.batch = 0
+        self.batch = "none"
 
     def setL1Regularization(self,scale=0.005):
-        self.regMethod = 1
+        self.regMethod = "L1"
         self.l1Scale = scale
 
     def setL2Regularization(self, scale=10e-3):
-        self.regMethod = 2
+        self.regMethod = "L2"
         self.l2Scale = scale
 
     def setDropOutRegularization(self, dropout_rates=[]):
-        self.regMethod = 3
+        self.regMethod = "dropout"
         if (len(dropout_rates) < self.layers):
             self.dropout_rates = [0.5 for i in range(self.layers)]
             self.dropout_rates[0] = 0.8
@@ -62,7 +62,7 @@ class tf_ann(object):
             
 
     def setNoRegularization(self):
-        self.regMethod = 0
+        self.regMethod = "none"
 
     def setAdamOptimizer(self,beta1=0.9, beta2=0.999, epsilon=1e-08):
         self.optimizer = "adam"
@@ -84,11 +84,11 @@ class tf_ann(object):
         self.momentum = momentum
 
     def setBatch(self,batchSize=10):
-        self.batch = 1
+        self.batch = "batch"
         self.batchSize = batchSize
 
     def setNoBatch(self):
-        self.batch = 1
+        self.batch = "none"
 
     def predict(self,X,Y):
         
@@ -123,9 +123,7 @@ class tf_ann(object):
         OYT = self.argDecision(OY)
         
         D = len(X[0])
-        MD = int(len(X[0])*self.layerSizeMultiplier) # number of input parameters
-        with open(self.destPath+"trainParams.txt","a") as paramsFile:
-            paramsFile.write("%14s," % str(MD))
+        MD = int(len(X[0])*self.layerSizeMultiplier) # number of input parameters        
         M = self.getMVals(MD) #hidden layer size
         K = int(Y.shape[1]) # of classes (number of output parameters)
         #==================================
@@ -189,7 +187,7 @@ class tf_ann(object):
 
         
         
-        if (self.regMethod < 3): #NOT DROPOUT (could be L1 or L2)
+        if (self.regMethod != "dropout"): #NOT DROPOUT (could be L1 or L2)
             tfY = tf.placeholder(tf.float32, [None, K])
             tf_cost = tf.reduce_mean(
                 tf.nn.softmax_cross_entropy_with_logits_v2(
@@ -203,16 +201,16 @@ class tf_ann(object):
                     logits=logits
                 )
             )
-            if (self.regMethod ==  1):
+            if (self.regMethod ==  "L1"):
                 #https://stackoverflow.com/questions/36706379/how-to-exactly-add-l1-regularisation-to-tensorflow-error-function
                 l1_regularizer = tf.contrib.layers.l1_regularizer(
                     scale=self.l1Scale, scope=None
                     )
                 tf_cost += tf.contrib.layers.apply_regularization(l1_regularizer, Wb)
-            elif (self.regMethod == 2):
+            elif (self.regMethod == "L2"):
                 l2_regulizer = self.l2Scale*sum([tf.nn.l2_loss(aweight) for aweight in Wb])
                 tf_cost += l2_regulizer
-        elif (self.regMethod == 3): #IS DROPOUT
+        elif (self.regMethod == "dropout"): #IS DROPOUT
             dropoutLogits = self.tf_dropoutForward(tfX, Wb)
             tfY = tf.placeholder(tf.int64, shape=(None,))
             tf_cost = tf.reduce_mean(
@@ -258,7 +256,7 @@ class tf_ann(object):
         # Sampling: Batch
         #
         #=================================
-        if self.batch == 1:
+        if self.batch == "batch":
             numBatches = int(len(X)/self.batchSize)
             #ERROR FIX: large overfit sample size causes overflow
             OX = OX[0:self.batchSize]
@@ -276,12 +274,12 @@ class tf_ann(object):
                 # tensorflow forward
                 #
                 #=================================
-                if self.batch == 1:
+                if self.batch == "batch":
                     X,Y,YT = self.myShuffle(X,Y,YT)
                     for batchRun in range(numBatches):
                         batchX = X[batchRun*self.batchSize:(batchRun*self.batchSize + self.batchSize)]
                         batchY = Y[batchRun*self.batchSize:(batchRun*self.batchSize + self.batchSize)]
-                        if (self.regMethod == 3): #IS DROPOUT
+                        if (self.regMethod == "dropout"): #IS DROPOUT
                             costY = self.argDecision(batchY)
                             
                         else:
@@ -305,16 +303,14 @@ class tf_ann(object):
                             #=================================
                             # Stopping Conditions
                             #================================
-                            if abs(rprev-r) < 0.001:
-                                #if np.abs(C) < 10e-1:
-                                rprev = r
-                                rChangeCount += 1
-                                if (rChangeCount > 10):
-                                    stopReason = "ClassRateChange"
-                                    break
-                            else:
-                                rChangeCount = 0
-                        
+
+                            if (r > 0.9):
+                                stopReason = "90classification"
+                                break
+                            if (C < 0.001):
+                                stopReason = "lowCost"
+                                break
+                                                    
                             if (ro>OFMax):
                                 OFMax = ro
                                 OFiteration=1
@@ -329,26 +325,37 @@ class tf_ann(object):
                                     OFstopro = ro
                                     OFstopiteration = iteration
                             else:
-                                if (ro < .3):
-                                    OFiteration = 1
+                                #if (ro < .3):
+                                #    OFiteration = 1
+                                #else:
+                                #if overfit is 10% < OFMax
+                                if (r > ro and (OFMax - 0.10) > ro ):
+                                    OFiteration += 1
                                 else:
-                                    #if overfit is 10% < OFMax
-                                    if (r > ro and (OFMax - 0.10) > ro ):
-                                        OFiteration += 1
-                                    else:
-                                        OFiteration = 1
+                                    OFiteration = 1
                                 
                             #OFiteration+=1
-                            if (OFiteration>self.overfitSteps):
-                                stopReason = "Overfit"
-                                break
+                            if (iteration > int(self.trainIterations/10)):
+                                if abs(rprev-r) < 0.001:
+                                    #if np.abs(C) < 10e-1:
+                                    rChangeCount += 1
+                                    if (rChangeCount > 10):
+                                        stopReason = "ClassRateChange"
+                                        break
+                                else:
+                                    rChangeCount = 0
+                                rprev = r
+
+                                if (OFiteration>self.overfitSteps):
+                                    stopReason = "Overfit"
+                                    break
                             with open(self.dir_path + "/trainStatusFile.txt","a") as TSFile:
                                 TSFile.write("\n----------\niteration:"+str(iteration)+"\ncost:"+str(C)+"\nclassifcation:"+str(r)+"\nOverfitClass:"+str(ro)+"\n")
                             cost.append(C)
                             YTrate.append(r)
                             OYTrate.append(ro)
                 else:
-                    if (self.regMethod == 3): #IS DROPOUT
+                    if (self.regMethod == "dropout"): #IS DROPOUT
                         costY = self.argDecision(Y)
                             
                     else:
@@ -368,16 +375,13 @@ class tf_ann(object):
                         #=================================
                         # Stopping Conditions
                         #================================
-                        if abs(rprev-r) < 0.001:
-                            #if np.abs(C) < 10e-1:
-                            rprev = r
-                            rChangeCount += 1
-                            if (rChangeCount > 10):
-                                stopReason = "ClassRateChange"
-                                break
-                        else:
-                            rChangeCount = 0
-                        
+                        if (r > 0.9):
+                            stopReason = "90classification"
+                            break
+                        if (c < 0.001):
+                            stopReason = "lowCost"
+                            break
+                                                    
                         if (ro>OFMax):
                             OFMax = ro
                             OFiteration=1
@@ -392,19 +396,30 @@ class tf_ann(object):
                                 OFstopro = ro
                                 OFstopiteration = iteration
                         else:
-                            if (ro < .3):
-                                OFiteration = 1
+                            #if (ro < .3):
+                            #    OFiteration = 1
+                            #else:
+                            #if overfit is 10% < OFMax
+                            if (r > ro and (OFMax - 0.10) > ro ):
+                                OFiteration += 1
                             else:
-                                #if overfit is 10% < OFMax
-                                if (r > ro and (OFMax - 0.10) > ro ):
-                                    OFiteration += 1
-                                else:
-                                    OFiteration = 1
+                                OFiteration = 1
                                 
-                        #OFiteration+=1
-                        if (OFiteration>self.overfitSteps):
-                            stopReason = "Overfit"
-                            break
+                            #OFiteration+=1
+                        if (iteration > int(self.trainIterations/10)):
+                            if abs(rprev-r) < 0.001:
+                                #if np.abs(C) < 10e-1:
+                                rChangeCount += 1
+                                if (rChangeCount > 10):
+                                    stopReason = "ClassRateChange"
+                                    break
+                            else:
+                                rChangeCount = 0
+                            rprev = r
+
+                            if (OFiteration>self.overfitSteps):
+                                stopReason = "Overfit"
+                                break
                         with open(self.dir_path + "/trainStatusFile.txt","a") as TSFile:
                             TSFile.write("\n----------\niteration:"+str(iteration)+"\ncost:"+str(C)+"\nclassifcation:"+str(r)+"\nOverfitClass:"+str(ro)+"\n")
                         cost.append(C)
@@ -435,7 +450,7 @@ class tf_ann(object):
         #=================
         # OUTSIDE LOOP
         #================
-        if (self.batch != 1 and not trainError):
+        if (self.batch != "batch" and not trainError):
             C = sess.run(tf_cost, feed_dict={tfX: X, tfY: Y})
             expA = np.exp(sess.run(logits, feed_dict={tfX: X, tfY: Y}))
             Prob = expA / expA.sum(axis=1, keepdims=True)
@@ -463,8 +478,12 @@ class tf_ann(object):
         tfile.close()
 
         with open(self.destPath+"trainParams.txt","a") as trainFile:
+            trainFile.write("%14s," % str(MD))
             trainFile.write("%14s," % str(iteration))
             trainFile.write("%14s," % stopReason)
+            trainFile.write("%14s," % self.regMethod)
+            trainFile.write("%14s," % self.optimizer)
+            trainFile.write("%14s," % self.batch)
             trainFile.write("%14s," % (str("%4.2f" % C)))
             trainFile.write("%14s," % (str("%4.2f" % r)))
             trainFile.write("%14s," % (str("%4.2f" % ro)))
