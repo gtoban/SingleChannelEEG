@@ -15,8 +15,8 @@ from paramFile import paramHolder
 #                DATA PREP
 #
 ##################################################
-
-gparam = paramHolder()
+newStart = False
+gparam = paramHolder(newStart) #dont overwrite old params
 
 def main():
     #Train args  : softAnn.py fname oname dest
@@ -32,17 +32,18 @@ def main():
         fname = gparam.dir_path+"/PCAData/input" + sys.argv[1] + ".csv"
         oname = gparam.dir_path+"/PCAData/input" + sys.argv[2] + ".csv"
         gparam.destPath += "/Results/" + sys.argv[3] + "/"
-        paramsFile=open(gparam.destPath+"trainParams.txt","w")
-        paramsFile.write("    train Data,  Overfit Data, learning Rate,")
-        paramsFile.write("max Iterations,   print Steps, Overfit Steps,")
-        paramsFile.write("    activation,     normalize,    ANN layers,     layerSize,")
-        paramsFile.write("        stopIt,")
-        paramsFile.write("    stopReason,regularization,    optimizer,       sample,")
-        paramsFile.write("          Cost,     ClassRate,")
-        paramsFile.write("  OvrftClassRt,")
-        paramsFile.write("      OFStopIt,")
-        paramsFile.write("        OFCost,   OFClassRate,OFOvrftClassRt\n")        
-        paramsFile.close()
+        if (newStart):
+            paramsFile=open(gparam.destPath+"trainParams.txt","w")
+            paramsFile.write("    train Data,  Overfit Data, learning Rate,")
+            paramsFile.write("max Iterations,   print Steps, Overfit Steps,")
+            paramsFile.write("    activation,     normalize,    ANN layers,     layerSize,")
+            paramsFile.write("        stopIt,")
+            paramsFile.write("    stopReason,regularization,    optimizer,       sample,")
+            paramsFile.write("          Cost,     ClassRate,")
+            paramsFile.write("  OvrftClassRt,")
+            paramsFile.write("      OFStopIt,")
+            paramsFile.write("        OFCost,   OFClassRate,OFOvrftClassRt\n")        
+            paramsFile.close()
         
         if (len(sys.argv) > 4):
             trainingSets = int(sys.argv[4]) #the number of different sets of random variables to train with
@@ -93,7 +94,7 @@ def tf_trainMult(fname,oname, trainSets):
 
     
     annObj = tf_ann(gparam.dir_path, gparam.destPath)
-        
+    gparam.getNewParamSet()
     for trainSet in range(trainSets):
         #paramsFile.write("%14s" %) #14 digits
         open(gparam.dir_path + "/trainStatusFile.txt","w").close()

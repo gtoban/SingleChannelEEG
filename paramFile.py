@@ -2,7 +2,7 @@ import os
 import numpy as np
 
 class paramHolder(object):
-    def __init__(self):
+    def __init__(self, newStart = True):
         self.learningRate = 10e-3 #learning rate
         self.trainIterations = 100000 #100000 #10000
         self.trainPrintStep = 100
@@ -32,8 +32,10 @@ class paramHolder(object):
         self.optimizer = "gradientdescent"
         self.batch = "none"
         self.getString()
-        with open(self.dir_path + "/trainParamsFile.txt", "w") as pf:
-            pf.write(self.paramString + "\n")
+        if (newStart):
+            with open(self.dir_path + "/trainParamsFile.txt", "w") as pf:
+                pf.write(self.paramString + "\n")
+        
 
     def getNewParamSet(self):
         regMethods = ["none", "L2", "dropout"]
@@ -63,7 +65,8 @@ class paramHolder(object):
                             str(self.learningRate) + "|" +
                             str(self.regMethod) + "|" +
                             str(self.optimizer) + "|" +
-                            str(self.batch))
+                            str(self.batch) + "|" +
+                            str(self.layers))
     def checkDuplicate(self):
         self.getString()
         with open(self.dir_path + "/trainParamsFile.txt") as pf:
