@@ -305,8 +305,8 @@ class tf_ann(object):
                             # Stopping Conditions
                             #================================
 
-                            if (r > 0.9):
-                                stopReason = "90classification"
+                            if (r > 0.99):
+                                stopReason = "99classification"
                                 break
                             if (C < 0.001):
                                 stopReason = "lowCost"
@@ -376,8 +376,8 @@ class tf_ann(object):
                         #=================================
                         # Stopping Conditions
                         #================================
-                        if (r > 0.9):
-                            stopReason = "90classification"
+                        if (r > 0.99):
+                            stopReason = "99classification"
                             break
                         if (C < 0.001):
                             stopReason = "lowCost"
