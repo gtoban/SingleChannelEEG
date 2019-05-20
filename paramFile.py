@@ -36,7 +36,7 @@ class paramHolder(object):
             pf.write(self.paramString + "\n")
 
     def getNewParamSet(self):
-        regMethods = ["none", "L1", "L2", "dropout"]
+        regMethods = ["none", "L2", "dropout"]
         optimizers = ["none", "adam", "gradientdescent", "momentum", "rmsprop"]
         batches = ["none", "batch"]
         duplicate = True
