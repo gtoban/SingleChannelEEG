@@ -32,7 +32,7 @@ class tf_ann(object):
         self.predictOverfit = predictOverfit
         self.layers = layers
     
-    def train_init(self, layerSizeMultiplier, layers, trainStart, trainIterations, trainPrintStep, learningRate, overfitSteps ):
+    def train_init(self, layerSizeMultiplier, layers, trainStart, trainIterations, trainPrintStep, learningRate, overfitSteps, printWeights ):
         self.layerSizeMultiplier = layerSizeMultiplier
         self.layers = layers
         self.trainStart = trainStart
@@ -43,7 +43,8 @@ class tf_ann(object):
         self.regMethod = "none"
         self.optimizer = "gradientdescent"
         self.batch = "none"
-
+        self.printWeights = printWeights
+        
     def setL1Regularization(self,scale=0.005):
         self.regMethod = "L1"
         self.l1Scale = scale
@@ -363,8 +364,8 @@ class tf_ann(object):
                     sess.run(train_op, feed_dict={tfX: X, tfY: costY})
                     if iteration%self.trainPrintStep == 0:
                         #C = costFunc(Y,Prob)
-                        C = sess.run(tf_cost, feed_dict={tfX: X, tfY: costY}) 
-                        expA = np.exp(sess.run(tf_testcost, feed_dict={tfX: X}))
+                        C = sess.run(tf_testcost, feed_dict={tfX: X, tfY: costY}) 
+                        expA = np.exp(sess.run(logits, feed_dict={tfX: X}))
                         Prob = expA / expA.sum(axis=1, keepdims=True)
                         P = self.argDecision(Prob)
                         expAo = np.exp(sess.run(logits, feed_dict={tfX: OX}))
@@ -378,7 +379,7 @@ class tf_ann(object):
                         if (r > 0.9):
                             stopReason = "90classification"
                             break
-                        if (c < 0.001):
+                        if (C < 0.001):
                             stopReason = "lowCost"
                             break
                                                     
@@ -468,14 +469,14 @@ class tf_ann(object):
 
         with open(self.dir_path + "/trainStatusFile.txt","a") as TSFile:
             TSFile.write("\n----------\niteration:"+str(iteration)+"\ncost:"+str(C)+"\nclassifcation:"+str(r)+"\nOverfitClass:"+str(ro)+"\n")
-        tfile = open(self.destPath + "trainStats.txt", "w")
-        tfile.write("\n----------\niteration:" + str(iteration)+"\ncost:"+str(C)+"\nclassifcation:"+str(r)+"\noverfit classification:"+str(ro)+"\n")
+        #tfile = open(self.destPath + "trainStats.txt", "w")
+        #tfile.write("\n----------\niteration:" + str(iteration)+"\ncost:"+str(C)+"\nclassifcation:"+str(r)+"\noverfit classification:"+str(ro)+"\n")
 
-        if(OFiteration > self.overfitSteps):
-        
-            tfile.write("\n----------\nOverFit Stop At:\n")
-            tfile.write("\n----------\niteration:" + str(OFstopiteration)+"\ncost:"+str(OFstopC)+"\nclassifcation:"+str(OFstopr)+"\noverfit classification:"+str(OFstopro)+"\n")
-        tfile.close()
+        #if(OFiteration > self.overfitSteps):
+        #
+        #    tfile.write("\n----------\nOverFit Stop At:\n")
+        #    tfile.write("\n----------\niteration:" + str(OFstopiteration)+"\ncost:"+str(OFstopC)+"\nclassifcation:"+str(OFstopr)+"\noverfit classification:"+str(OFstopro)+"\n")
+        #tfile.close()
 
         with open(self.destPath+"trainParams.txt","a") as trainFile:
             trainFile.write("%14s," % str(MD))
@@ -492,23 +493,25 @@ class tf_ann(object):
             trainFile.write("%14s," % (str("%4.2f" % OFstopC)))
             trainFile.write("%14s," % (str("%4.2f" % OFstopr)))
             trainFile.write("%14s" % (str("%4.2f" % OFstopro)))
-        
-        for i in range(int(len(Wb)/2)):
-            index = i*2
-            self.writeTrainedNodes(Wb[index].eval(session=sess),
-                            Wb[index+1].eval(session=sess),
-                            i)
-            self.writeOverfitTrainedNodes(OWb[index],
-                                    OWb[index+1],
-                                    i)
+            trainFile.write("\n")
+
+        if (self.printWeights):
+            for i in range(int(len(Wb)/2)):
+                index = i*2
+                self.writeTrainedNodes(Wb[index].eval(session=sess),
+                                Wb[index+1].eval(session=sess),
+                                i)
+                self.writeOverfitTrainedNodes(OWb[index],
+                                OWb[index+1],
+                                i)
     
-        sess.close()
         
-        self.writeTrainInfo(cost, self.destPath + "cost.dat")
-        self.writeTrainInfo(YTrate, self.destPath + "YTrate.dat")
-        self.writeTrainInfo(OYTrate, self.destPath + "OYTrate.dat")
+        
+            self.writeTrainInfo(cost, self.destPath + "cost.dat")
+            self.writeTrainInfo(YTrate, self.destPath + "YTrate.dat")
+            self.writeTrainInfo(OYTrate, self.destPath + "OYTrate.dat")
 
-
+        sess.close()
     
 
     def init_weights(self,shape):

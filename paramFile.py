@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 class paramHolder(object):
     def __init__(self):
@@ -26,3 +27,51 @@ class paramHolder(object):
         self.destPath = self.dir_path
         self.trainId = ""
         self.trainDestination = self.dir_path
+        self.printWeights = True
+        self.regMethod = "none"
+        self.optimizer = "gradientdescent"
+        self.batch = "none"
+        self.getString()
+        with open(self.dir_path + "/trainParamsFile.txt", "w") as pf:
+            pf.write(self.paramString + "\n")
+
+    def getNewParamSet(self):
+        regMethods = ["none", "L1", "L2", "dropout"]
+        optimizers = ["none", "adam", "gradientdescent", "momentum", "rmsprop"]
+        batches = ["none", "batch"]
+        duplicate = True
+
+        while (duplicate): 
+            self.layerSizeMultiplier = int(np.random.normal(.9,.175)*10)/10 # .2 - 1.5
+            temp = 1 + abs(int(np.random.normal(0.0,4.0))) #want more 2
+            self.layers = 2**temp #2 - 16
+        
+            #10 ^ -2 - 10^-7 Want bigger steps for bigger layers
+            # https://stackoverflow.com/questions/929103/convert-a-number-range-to-another-range-maintaining-ratio
+            # NewValue = (((OldValue - OldMin) * (NewMax - NewMin)) / (OldMax - OldMin)) + NewMin
+            temp = int((((1/self.layers - 1/16) * (7 - 2)) / (1/2 - 1/16)) + 1) # get a new number
+            temp += abs(int(np.random.normal(0.0,1))) # all it to change a little bit
+            temp = -1*min(temp, 2 + abs(int(np.random.normal(0.0,2.5)))%5)
+            self.learningRate = 10**temp
+            self.regMethod = regMethods[np.random.randint(0,len(regMethods))]
+            self.optimizer = optimizers[np.random.randint(0,len(optimizers))]
+            self.batch = batches[np.random.randint(0,len(batches))]
+            duplicate = self.checkDuplicate()
+
+    def getString(self):
+        self.paramString = (str(self.layerSizeMultiplier) + "|" +
+                            str(self.learningRate) + "|" +
+                            str(self.regMethod) + "|" +
+                            str(self.optimizer) + "|" +
+                            str(self.batch))
+    def checkDuplicate(self):
+        self.getString()
+        with open(self.dir_path + "/trainParamsFile.txt") as pf:
+            line = pf.readline().strip()
+            while (line != ""):
+                if line == self.paramString:
+                    return True
+                line = pf.readline().strip()
+        with open(self.dir_path + "/trainParamsFile.txt", "a") as pf:
+            pf.write(self.paramString + "\n")
+        return False
