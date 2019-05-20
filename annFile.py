@@ -512,6 +512,8 @@ class tf_ann(object):
             self.writeTrainInfo(OYTrate, self.destPath + "OYTrate.dat")
 
         sess.close()
+        tf.reset_default_graph()
+
     
 
     def init_weights(self,shape):
