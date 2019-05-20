@@ -451,21 +451,21 @@ class tf_ann(object):
         #=================
         # OUTSIDE LOOP
         #================
-        if (self.batch != "batch" and not trainError):
-            C = sess.run(tf_cost, feed_dict={tfX: X, tfY: Y})
-            expA = np.exp(sess.run(logits, feed_dict={tfX: X, tfY: Y}))
-            Prob = expA / expA.sum(axis=1, keepdims=True)
-            P = self.argDecision(Prob)
-        
-            expAo = np.exp(sess.run(logits, feed_dict={tfX: OX, tfY: OY}))
-            Probo = expAo / expAo.sum(axis=1, keepdims=True)
-            Po = self.argDecision(Probo)
-        
-            r = self.classification_rate(YT,P)
-            ro = self.classification_rate(OYT,Po)
-            cost.append(C)
-            YTrate.append(r)
-            OYTrate.append(ro)
+        #if (self.batch != "batch" and not trainError):
+        #    C = sess.run(tf_cost, feed_dict={tfX: X, tfY: Y})
+        #    expA = np.exp(sess.run(logits, feed_dict={tfX: X, tfY: Y}))
+        #    Prob = expA / expA.sum(axis=1, keepdims=True)
+        #    P = self.argDecision(Prob)
+        #
+        #    expAo = np.exp(sess.run(logits, feed_dict={tfX: OX, tfY: OY}))
+        #    Probo = expAo / expAo.sum(axis=1, keepdims=True)
+        #    Po = self.argDecision(Probo)
+        #
+        #    r = self.classification_rate(YT,P)
+        #    ro = self.classification_rate(OYT,Po)
+        #    cost.append(C)
+        #    YTrate.append(r)
+        #    OYTrate.append(ro)
 
         with open(self.dir_path + "/trainStatusFile.txt","a") as TSFile:
             TSFile.write("\n----------\niteration:"+str(iteration)+"\ncost:"+str(C)+"\nclassifcation:"+str(r)+"\nOverfitClass:"+str(ro)+"\n")
