@@ -161,6 +161,7 @@ class tf_ann(object):
         
         stopReason="Iterations"
         stored_exception = 0
+        C=r=ro=0
         rprev = 100
         rChangeCount = 0
         OFMax = 0
