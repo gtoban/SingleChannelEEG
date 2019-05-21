@@ -47,6 +47,10 @@ class paramHolder(object):
             self.layerSizeMultiplier = int(np.random.normal(.9,.175)*10)/10 # .2 - 1.5
             temp = 1 + abs(int(np.random.normal(0.0,4.0))) #want more 2
             self.layers = 2**temp #2 - 16
+            if (self.layers > 16 or self.layers < 2):
+                print("LAYERS OUT OF RANGE:", self.layers)
+                exit()
+              
         
             #10 ^ -2 - 10^-7 Want bigger steps for bigger layers
             # https://stackoverflow.com/questions/929103/convert-a-number-range-to-another-range-maintaining-ratio
@@ -55,6 +59,10 @@ class paramHolder(object):
             temp += abs(int(np.random.normal(0.0,1))) # all it to change a little bit
             temp = -1*min(temp, 2 + abs(int(np.random.normal(0.0,2.5)))%5)
             self.learningRate = 10**temp
+            if (self.learningRate > 10**-2 or self.learningRate < 10**-7):
+                print("LEARNING RATE OUT OF RANGE:", self.learningRate)
+                exit()
+              
             self.regMethod = regMethods[np.random.randint(0,len(regMethods))]
             self.optimizer = optimizers[np.random.randint(0,len(optimizers))]
             self.batch = batches[np.random.randint(0,len(batches))]
