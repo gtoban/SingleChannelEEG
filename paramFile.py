@@ -45,8 +45,7 @@ class paramHolder(object):
 
         while (duplicate): 
             self.layerSizeMultiplier = int(np.random.normal(.9,.175)*10)/10 # .2 - 1.5
-            temp = 1 + abs(int(np.random.normal(0.0,4.0))) #want more 2
-            self.layers = 2**temp #2 - 16
+            self.layers = 2 + abs(int(np.random.normal(0.0,4.0)))%14 #2 - 16
             if (self.layers > 16 or self.layers < 2):
                 print("LAYERS OUT OF RANGE:", self.layers)
                 exit()
