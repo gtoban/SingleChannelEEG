@@ -56,9 +56,9 @@ class paramHolder(object):
             # NewValue = (((OldValue - OldMin) * (NewMax - NewMin)) / (OldMax - OldMin)) + NewMin
             temp = int((((1/self.layers - 1/16) * (7 - 2)) / (1/2 - 1/16)) + 1) # get a new number
             temp += abs(int(np.random.normal(0.0,1))) # all it to change a little bit
-            temp = -1*min(temp, 2 + abs(int(np.random.normal(0.0,2.5)))%5)
+            temp = -1*min(temp, 1 + abs(int(np.random.normal(0.0,2.5)))%6)
             self.learningRate = 10**temp
-            if (self.learningRate > 10**-2 or self.learningRate < 10**-7):
+            if (self.learningRate > 10**-1 or self.learningRate < 10**-7):
                 print("LEARNING RATE OUT OF RANGE:", self.learningRate)
                 exit()
               
