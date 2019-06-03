@@ -8,6 +8,14 @@ import os
 import signal
 import time
 
+#=============================== CURRENT NOTES
+#
+#
+# NO WAY TO ALTERNATE NODES PER LAYER, ACTIVATION FUNCTION PER LAYER OR OTHERWISE, INITIAL WEIGHT GUESS:
+# REASON: While there is a way to do this, the benefits do not seem to warrant the additional complexity at this time.
+#
+#==================================
+
 #https://stackoverflow.com/questions/18499497/how-to-process-sigterm-signal-gracefully
 class GracefulKiller:
   kill_now = False
@@ -17,6 +25,8 @@ class GracefulKiller:
 
   def exit_gracefully(self,signum, frame):
     self.kill_now = True
+
+
 
 
 class tf_ann(object):
@@ -306,7 +316,7 @@ class tf_ann(object):
                             # Stopping Conditions
                             #================================
 
-                            if (r > 0.99):
+                            if (r > 0.99 and ro > 0.99):
                                 stopReason = "99classification"
                                 break
                             if (C < 0.001):
@@ -377,7 +387,7 @@ class tf_ann(object):
                         #=================================
                         # Stopping Conditions
                         #================================
-                        if (r > 0.99):
+                        if (r > 0.99 and ro > 0.99)):
                             stopReason = "99classification"
                             break
                         if (C < 0.001):
